@@ -1,0 +1,793 @@
+	;============================================================================
+	; ***** (footytest.hsp) - Footy2 Edit Control (footy2.dll)利用サンプル *****
+	;
+	;                                                        HSP-NEXT Sakura
+	;============================================================================
+
+	#include "footy2nx.as"
+	#include "support.as"
+	#include "hscallbk.as"
+
+	;***** SkEditor 定義 *****
+	#define SkEditorVer "0.0.3"
+	
+	;***** 実行ファイル自動作成 ****
+	#packopt type 0
+	#packopt name "SkEditor"
+	#packopt runtime "hsprt"
+	#packopt hide 1
+
+	#module
+	;***** カーソル位置のトークンを取得 *****
+	#deffunc gettoken var prm1,str prm2,int prm3
+	strText = prm2 : ls=strlen(strText) : if ls==0 : return -1
+	nIndex  = prm3 : if nIndex<0 : nIndex=0
+
+	sdim strCharSet,256
+	strCharSet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_#"
+	nStart = nIndex
+	repeat
+		if nStart<=0 : nStart=0: break
+		strChar=strmid(strText,nStart,1)
+		nFoundIndex=instr(strCharSet,0,strChar)
+		if nFoundIndex<0 : nStart++ : break
+		nStart--
+	loop
+	nLength=strlen(strText)
+	nEnd = nIndex
+	repeat
+		if nEnd>=nLength : nEnd=nLength : break
+		strChar=strmid(strText,nEnd,1)
+		nFoundIndex=instr(strCharSet,0,strChar)
+		if nFoundIndex<0 : break
+		nEnd++
+	loop
+	if nStart>=nEnd : prm1 = "" : return 0
+	;***** 全て英数小文字に変換して結果を返す *****
+	prm1=getpath(strmid(strText,nStart,nEnd-nStart),16)
+	return 0
+	#global
+
+	;***** 必要となるAPI関数を定義 *****
+	#uselib "shell32.dll"
+	#func DragQueryFile "DragQueryFile" sptr,sptr,sptr,sptr
+	#func DragFinish "DragFinish" sptr
+	#func DragAcceptFiles "DragAcceptFiles" sptr,sptr
+	
+	#uselib "user32.dll"
+	#func   SetWindowLong "SetWindowLongA" int,int,int
+	#cfunc  GetWindowLong "GetWindowLongA" int,int
+	#cfunc  GetSystemMetrics "GetSystemMetrics" int
+	#func   DestroyWindow "DestroyWindow" int
+	#func   GetWindowRect "GetWindowRect" int,var
+
+	;***** オーバーラップウィンドウ作成用マクロ *****
+	#define GWL_STYLE			-16
+	#define overrapwin SetWindowLong hwnd,GWL_STYLE,GetWindowLong(hwnd,GWL_STYLE)-$1FB0000
+
+	;***** LOWORD/HIWORD/RGBマクロ *****
+	#define ctype LOWORD(%1) (%1&$ffff)
+	#define ctype HIWORD(%1) (%1>>16&$ffff)
+	#define ctype RGB(%1=0,%2=0,%3=0) (%1|(%2<<8)|(%3<<16))
+
+	;***** APIメッセージ定数 *****
+	#define WM_SIZE				$00000005
+	#define WM_SYSCOMMAND		$00000112
+	#define WM_COMMAND			$00000111
+	#define SC_MAXIMIZE			$0000F030
+	#define WM_RBUTTONDOWN		$00000204
+	#define WM_MENUSELECT		$0000011F
+	#define WM_DROPFILES		$00000233	
+
+	;***** 内部利用定数 *****
+	#const  INIX_pos			0					; Footy2 Edit Control初期位置(X)
+	#const  INIY_pos			0					; Footy2 Edit Control初期位置(Y)
+	#const  Def_WsizeX			640					; screen size default (X)
+	#const  Def_WsizeY			480					; screen size default (Y)
+	#const  MAX_PATH			512					; ファイル名取得用バッファサイズの最大値
+
+	;***** 色分けに利用する定数 *****
+	#const  HSP_PREPROCESS		RGB(10,180,200)		; HSPプリプロセッサ
+	#const  HSP_COMMAND			RGB(0,255,255)		; HSP命令、関数、システム変数
+	#const  HSP_COMMENT			RGB(128,255,0)		; HSPコメント
+	#const  HSP_LABEL			RGB(255,0,200)		; HSPラベル名
+	#const  HSP_BLOCK			RGB(0,180,255)		; HSP中括弧{ } 囲み
+	#const  HSP_SINGLEQUAT		RGB(255,200,0)		; HSPシングルコーテーション囲み範囲文字列
+	#const  HSP_DOBULEQUAT		RGB(255,200,0)		; HSPダブルコーテーション囲み範囲文字列
+	#const  HSP_CMDCOLOR		$0000F081			; HSP命令、関数、システム変数 (解析方法)
+	#const  FT_TEXTCOLOR		RGB(255,255,255)	; テキスト色
+	#const  FT_BACKCOLOR		RGB(0,0,0)			; 背景色
+	#const  FT_URLTXTCOLOR		RGB(200,255,255)	; URLテキスト色
+	#const  FT_UNDERLINECOLOR	RGB(200,0,0)		; アンダーライン色
+	#const  FT_CARETLINECOLOR	RGB(255,255,128)	; 行番号位置反転色
+	#const  FT_LINENUMTEXT		RGB(0,183,239)		; 行番号色
+
+	#const	SKRIPT_VARIABLE		RGB(0,255,255)		; %%囲みの変数
+
+	;***** コールバック関数の関数形式を定義 *****
+	#uselib ""
+	#func Footy2SetFuncMoveCaretProc "" int,int,int,int
+	#func Footy2SetFuncTextModifiedProc "" int,int,int
+	#func Footy2SetFuncInsertModeChangedProc "" int,int,int
+
+	;***** コールバック関数の登録 *****
+	setcallbk Proc0, Footy2SetFuncMoveCaretProc, *OnSetFuncMoveCaretProc
+	setcallbk Proc1, Footy2SetFuncTextModifiedProc, *OnSetFuncTextModifiedProc
+	setcallbk Proc2, Footy2SetFuncInsertModeChanged, *OnSetFuncInsertModeChangedProc
+
+	;***** 画面作成 *****
+	screen 0,ginfo_dispx,ginfo_dispy,2,,,Def_WsizeX,Def_WsizeY : overrapwin
+	color : boxf : sdim fname,MAX_PATH
+
+	;***** 起動ディレクトリ取得 *****
+	sdim Startdir,MAX_PATH
+	if hspstat&1=0 { Startdir=dir_exe+"\\" : chdir dir_exe
+	} else {
+		Startdir=dir_cur+"\\"
+	}
+	chdir Startdir
+
+	;***** HSP標準キーワードファイル読み込み *****
+	;gosub *innertbl   ; 内部テーブルのみとしておく
+
+	exist Startdir+"stdkeyword.txt"
+	if strsize ==-1 {
+		dialog "Skript構文定義ファイルの読み込みに失敗しました。",0
+		gosub *innertbl
+	} else {
+		;***** 通常の定義ファイル読み込み処理 *****
+		sdim keybuf,strsize+64
+		bload Startdir+"stdkeyword.txt",keybuf,strsize
+	}
+
+	;***** メニューバー、ステータスバー作成 *****
+	gosub *MenuProc
+	gosub *StatusProc
+
+	;***** Footy2 Edit Control作成 *****
+	nID=Footy2Create(hwnd,INIX_pos,INIY_pos,ginfo_winx,ginfo_winy-menu_h-sts_h,VIEWMODE_NORMAL)
+	if ( nID != FOOTY2ERR_NONE ) : end
+
+	;***** 現在のFooty2 Windowのハンドル取得 *****
+	nIDFhwnd = Footy2GetWnd(nID,VIEWMODE_NORMAL)
+
+	;***** Editorのフォント設定 *****
+	Footy2SetFontFace nID,FFM_ANSI_CHARSET,"MS Gothic",0
+	Footy2SetFontSize nID,11,0
+
+	;***** Editorの各部の配色設定 *****
+	gosub *editcolorset
+
+	;***** Editorのマーク表示設定 (EOFのみ表示) *****
+	gosub *editmarkset
+
+	;***** 初期フォーカス設定 *****
+	titlename="SkEditor - "
+	gosub *Setforcus : title titlename+"(untitled)"
+
+	;***** 割込み・メッセージイベント処理 *****
+	oncmd gosub *SizeAdjust,WM_SIZE
+	oncmd gosub *OnMenuCmd,WM_COMMAND
+	oncmd gosub *OnMenuSelect,WM_MENUSELECT
+	oncmd gosub *drop,WM_DROPFILES
+	DragAcceptFiles hwnd,1
+	
+	onkey gosub *keymode
+	;***** キーワードのカラー設定 *****
+	gosub *colorDIV
+
+	;***** Footy2の再描画 (設定内容更新) *****
+	Footy2Refresh nID
+
+	;***** キャレット位置をステータスバーに表示 (初期表示) *****
+	gosub *CaretPosInfo
+
+	;***** コールバック (イベント駆動) *****
+	Footy2SetFuncMoveCaret nID,varptr(Proc0),0,0
+	Footy2SetFuncTextModified nID,varptr(Proc1),0
+	Footy2SetFuncInsertModeChanged nID,varptr(Proc2),0
+
+	;***** ウィンドウを最大化 *****
+	sendmsg hwnd,WM_SYSCOMMAND,SC_MAXIMIZE,0
+	gosub *SizeAdjust
+	gsel 0,1
+	onexit *owari
+
+	if dir_cmdline != ""{
+		fname=dir_cmdline
+		strrep fname,"\"",""
+		if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
+			dialog "ファイルの読み込みに失敗しました。\n"+dir_cmdline,0
+		}else{
+			gosub *colorDIV
+			Footy2SetFocus nID,VIEWMODE_NORMAL : Footy2Refresh nID
+			; ファイル名をステータスバーに表示
+			Stsinf stshwnd," "+fname,2
+			title titlename+getpath(fname,8)
+		}
+	}
+	stop
+
+*drop
+	;***** Drag & Dropでのファイル名取得とファイルの読み込み *****
+	sdim ccbuf,512
+    hDrop=wParam   
+    if hDrop==0 : return  
+    DragQueryFile hDrop,0xffffffff,0,0 : num = stat
+    if num==0 : return  
+    repeat num
+		DragQueryFile hDrop,cnt,varptr(ccbuf),512  
+    loop  
+    DragFinish hDrop
+    ;***** 拡張子がas、hspでなかったらエラーとする。 *****
+    
+    //if ccbuf
+ 	//
+ 	// dialog "",0
+ 	//return
+    
+    gosub *Dragfile
+    return
+
+
+*OnSetFuncMoveCaretProc
+	;***** 現在の行、位置をステータスバーに表示 *****
+	; 行、位置は(0,0)からなので実際の行番号に対応させるため、＋1してある
+	nline = callbkarg(2)+1 : npos = callbkarg(3)
+	Stsinf stshwnd," line : "+(nline)+"  pos : "+npos,0
+	return
+
+*CaretPosInfo
+	;***** 行、位置初期表示 *****
+	Stsinf stshwnd," line : "+1+"  pos : "+0,0
+	return
+
+*OnSetFuncTextModifiedProc
+	;***** ユーザーの操作によってテキストが編集されたときに発生するイベント *****
+	gosub *colorDIV
+	Modified=callbkarg(2)
+	switch Modified
+			case MODIFIED_CAUSE_CHAR
+				stsmsg = "文字が入力された(IMEオフ)"   : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_IME
+				stsmsg = "文字が入力された(IMEオン)"   : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_DELETE
+				stsmsg = "Deleteキーが押下された"      : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_BACKSPAC
+				stsmsg = "BackSpaceが押下された"       : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_ENTER
+				stsmsg = "Enterキーが押下された"       : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_UNDO
+				stsmsg = "元に戻す処理が実行された"    : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_REDO
+				stsmsg = "やり直し処理が実行された"    : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_CUT
+				stsmsg = "切り取り処理が実行された"    : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_PASTE
+				stsmsg = "貼り付け処理が実行された"    : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_INDENT
+				stsmsg = "インデント処理が行われた"    : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_UNINDENT
+				stsmsg = "逆インデント処理が行われた"  : gosub *Setforcus
+				swbreak
+			case MODIFIED_CAUSE_TAB
+				stsmsg = "タブキーが押された"          : gosub *Setforcus
+				swbreak
+		swend
+		Stsinf stshwnd,stsmsg,2
+	return
+
+*OnSetFuncInsertModeChangedProc
+	;***** 挿入・上書のモード判定 *****
+	if callbkarg(2) & $ff {
+		stsmsg = " 挿入"
+	} else {
+		stsmsg = " 上書"
+	}
+	Stsinf stshwnd,stsmsg,1
+	return
+
+*innertbl
+		;***** 内部HSP標準命令定義テーブル *****
+		sdim keybuf : keybuf=""
+		keybuf += "comevdisp\ncomevarg\ncomevent\ndelcom\nnewcom\nquerycom\nsarrayconv\n"
+		keybuf += "assert\nlogmes\nbutton\nchkbox\nclrobj\ncombox\ninput\nlistbox\n"
+		keybuf += "mesbox\nobjmode\nobjprm\nobjsel\nobjsize\ncnt\ndir_cmdline\ndir_cur\n"
+		keybuf += "dir_desktop\ndir_exe\ndir_mydoc\ndir_sys\ndir_win\nerr\nginfo_act\n"
+		keybuf += "ginfo_b\nginfo_cx\nginfo_cy\nginfo_dispx\nginfo_dispy\nginfo_g\n"
+		keybuf += "ginfo_intid\nginfo_mesx\nginfo_mesy\nginfo_mx\nginfo_my\nginfo_paluse\n"
+		keybuf += "ginfo_r\nginfo_sel\nginfo_sizex\nginfo_sizey\nginfo_sx\nginfo_sy\n"
+		keybuf += "ginfo_vx\nginfo_vy\nginfo_winx\nginfo_winy\nginfo_wx1\nginfo_wx2\n"
+		keybuf += "ginfo_wy1\nginfo_wy2\nhdc\nhinstance\nhspstat\nhspver\nhwnd\niparam\n"
+		keybuf += "looplev\nlparam\nmousew\nmousex\nmousey\nmsgothic\nmsmincho\nnotemax\n"
+		keybuf += "notesize\nrefdval\nrefstr\nstat\nstrsize\nsublev\nthismod\nwparam\n"
+		keybuf += "bcopy\nbload\nbsave\nchdir\nchdpm\ndelete\ndirlist\nexist\nmemfile\n"
+		keybuf += "mkdir\n#addition\n#aht\n#ahtmes\n#cfunc\n#cmd\n#cmpopt\n#comfunc\n"
+		keybuf += "#const\n#defcfunc\n#deffunc\n#define\n#else\n#endif\n#enum\n#epack\n"
+		keybuf += "#func\n#global\n#if\n#ifdef\n#ifndef\n#include\n#modfunc\n#modinit\n"
+		keybuf += "#modterm\n#module\n#pack\n#packopt\n#regcmd\n#runtime\n#undef\n#usecom\n"
+		keybuf += "#uselib\n_break\n_continue\ncase\ndefault\ndo\nfor\nnext\nswbreak\n"
+		keybuf += "swend\nswitch\nuntil\nwend\nwhile\nawait\nbreak\ncontinue\nend\nexec\n"
+		keybuf += "exgoto\nforeach\ngosub\ngoto\nif\nloop\non\nonclick\noncmd\nonerror\n"
+		keybuf += "onexit\nonkey\nrepeat\nreturn\nrun\nstop\nwait\nmci\nmmload\nmmplay\n"
+		keybuf += "mmstop\nlpeek\npeek\nwpeek\nalloc\ncomres\nddim\ndelmod\ndim\ndimtype\n"
+		keybuf += "lpoke\nmemcpy\nmemexpand\nmemset\nnewmod\npoke\nsdim\nwpoke\naxobj\n"
+		keybuf += "bgscr\nbmpsave\nboxf\nbuffer\nchgdisp\ncircle\ncls\ncolor\ndialog\n"
+		keybuf += "font\ngcopy\ngmode\ngrect\ngroll\ngrotate\ngsel\ngsquare\ngzoom\n"
+		keybuf += "hsvcolor\nline\nmes\npalcolor\npalette\npget\npicload\npos\nprint\n"
+		keybuf += "pset\nredraw\nscreen\nsendmsg\nsyscolor\nsysfont\ntitle\nwidth\n"
+		keybuf += "winobj\nabs\nabsf\natan\ncallfunc\ncos\ndirinfo\ndouble\nexpf\ngettime\n"
+		keybuf += "ginfo\nint\nlength\nlength2\nlength3\nlength4\nlibptr\nlimit\nlimitf\n"
+		keybuf += "logf\nobjinfo\nrnd\nsin\nsqrt\nstr\nstrlen\nsysinfo\ntan\nvarptr\nvartype\n"
+		keybuf += "varuse\ngetkey\nmcall\nmouse\nrandomize\nstick\ndup\ndupptr\nmref\nand\n"
+		keybuf += "not\nor\nxor\ncnvwtos\ngetpath\ninstr\nnoteinfo\nstrf\nstrmid\ncnvstow\n"
+		keybuf += "getstr\nnoteadd\nnotedel\nnoteget\nnoteload\nnotesave\nnotesel\nnoteunsel\n"
+		keybuf += "sptr\nwstr\nwptr\nvar\narray\ndouble\nlabel\nfloat\npval\ncomobj\nbmscr\n"
+		keybuf += "prefstr\npexinfo\nnullptr\nctype\nglobal\nelse\n"
+
+		;***** ファイル消失時の定義ファイルを自動作成 *****
+		;bsave Startdir+"stdkeyword.txt",keybuf
+	return
+
+*editcolorset
+	;***** Editorの各部の配色設定 *****
+	Footy2SetColor nID,CP_TEXT,FT_TEXTCOLOR,0				; エディタのテキスト色 (通常の文字)
+	Footy2SetColor nID,CP_BACKGROUND,FT_BACKCOLOR,0			; エディタの背景色
+	Footy2SetColor nID,CP_URLTEXT,FT_URLTXTCOLOR,0			; エディタのURLテキスト色
+	Footy2SetColor nID,CP_URLUNDERLINE,FT_UNDERLINECOLOR,0	; URL下に表示されるアンダーライン
+	Footy2SetColor nID,CP_UNDERLINE,FT_UNDERLINECOLOR,0		; キャレットの下のアンダーライン色
+	Footy2SetColor nID,CP_CARETLINE,FT_CARETLINECOLOR,0		; 行番号領域におけるキャレット位置強調色
+	Footy2SetColor nID,CP_LINENUMTEXT,FT_LINENUMTEXT,0		; 行番号テキスト色
+
+	;***** その他各部の配色設定 (必要に応じて利用する) *****
+	Footy2SetColor nID,CP_CRLF,RGB(220,220,220),0			; 改行マーク
+	Footy2SetColor nID,CP_HALFSPACE,RGB(220,220,220),0		; 半角スペース
+	Footy2SetColor nID,CP_NORMALSPACE,RGB(220,220,220),0	; 全角スペース
+	Footy2SetColor nID,CP_TAB,RGB(196,196,196),0			; タブ文字
+	Footy2SetColor nID,CP_LINENUMBORDER,RGB(0,255,255),0	; 行番号とテキストエディタの境界線
+	Footy2SetColor nID,CP_RULERBACKGROUND,RGB(255,251,210),0; ルーラーの背景色
+	Footy2SetColor nID,CP_RULERTEXT,RGB(0,0,0),0			; ルーラーのテキスト
+	Footy2SetColor nID,CP_RULERLINE,RGB(0,0,0),0			; ルーラー上の線
+	Footy2SetColor nID,CP_CARETPOS,RGB(0,169,251),0		; ルーラーにおけるキャレット位置強調
+	Footy2SetColor nID,CP_URLTEXT,RGB(0,0,255),0			; URL文字
+	Footy2SetColor nID,CP_URLUNDERLINE,RGB(0,0,255),0		; URL下に表示されるアンダーライン
+	Footy2SetColor nID,CP_MAILTEXT,RGB(0,0,255),0			; メールアドレス文字
+	Footy2SetColor nID,CP_MAILUNDERLINE,RGB(0,0,255),0		; メール下に表示される文字列
+	Footy2SetColor nID,CP_HIGHLIGHTTEXT,RGB(0,0,0),0		; ハイライトテキスト
+	; ハイライト背景色
+	Footy2SetColor nID,CP_HIGHLIGHTBACKGROUND,RGB(255,255,255),0
+	return
+
+*editmarkset
+	;***** Editorのマーク非表示設定 (EOFのみ表示) *****
+	Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_EOF,0			; [EOF]マーク
+	;***** その他Editorのマーク設定 (必要に応じて利用する) *****
+	;Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_SHOW_NONE,0	; 何も表示しない
+	;Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_SHOW_ALL,0	; 全て表示する
+	;Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_HALF_SPACE,0	; 半角スペース
+	;Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_FULL_SPACE,0	; 全角スペース
+	;Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_TAB,0			; タブマーク
+	;Footy2SetMetrics nID,SM_MARK_VISIBLE,EDM_LINE,0		; 改行マーク
+	return
+
+;//////// ファイル操作関係処理 ////////
+*Dragfile
+	gosub *filenew
+	fname=ccbuf
+	if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
+		dialog "ファイルの読み込みに失敗しました。",0 : return
+	}
+	gosub *colorDIV
+	Footy2SetFocus nID,VIEWMODE_NORMAL : Footy2Refresh nID
+	;***** ファイル名をステータスバーに表示 *****
+	Stsinf stshwnd," "+fname,2
+	title titlename+getpath(fname,8)
+	return
+
+*fileopen
+	;***** ファイルの選択と読み込み *****
+	dialog "hsp", 16 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
+	fname=refstr
+	if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
+		dialog "ファイルの読み込みに失敗しました。",0 : return
+	}
+	gosub *colorDIV
+	Footy2SetFocus nID,VIEWMODE_NORMAL : Footy2Refresh nID
+	; ファイル名をステータスバーに表示
+	Stsinf stshwnd," "+fname,2
+	title titlename+getpath(fname,8)
+	return
+
+*filesave
+	;***** ファイルの保存 *****
+	dialog "hsp", 17 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
+	fname=refstr
+	if (Footy2SaveToFile(nID, fname, CSM_AUTOMATIC, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
+		dialog "ファイルの保存に失敗しました。",0 : return
+	}
+	return
+
+*filenew
+	;***** ファイルの新規作成 *****
+	Footy2CreateNew nID : Footy2Refresh nID
+	title titlename+"(untitled)"
+	return
+
+*savenow
+	;***** ファイルの上書き保存 *****
+	if (Footy2SaveToFile(nID, fname, CSM_AUTOMATIC, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
+		gosub *filesave
+	}
+	return
+
+;//////// 編集関係処理 (menu_bar,ショートカットキー等兼用) ////////
+*undo
+	;***** 元に戻す *****
+	Footy2Undo nID : return
+
+*redo
+	;***** やり直し *****
+	Footy2Redo nID : stop
+
+*cut
+	;***** 切り取り *****
+	Footy2Cut nID : return
+
+*copy
+	;***** 複写 *****
+	Footy2Copy nID : return
+
+*paste
+	;***** 貼り付け *****
+	Footy2Paste nID : return
+
+*selectall
+	;***** 全て選択 *****
+	Footy2SelectAll nID,1 : return
+
+*selectcan
+	;***** 全選択範囲の解除 (代用) *****
+	Footy2SetCaretPosition nID,0,0,1 : return
+
+;//////// カーソル移動関係処理 ////////
+*movetop
+	;***** 先頭行に移動 *****
+	Footy2SetCaretPosition nID,0,0,1 : return
+
+*movelast
+	;***** 最終行に移動 *****
+	Footy2SetCaretPosition nID,(Footy2GetLines(nID)-2),0,1 : return
+
+*moveother
+	;***** 指定行に移動 *****
+	return
+
+;//////// 文字列の検索・置換関係処理 ////////
+*strfind
+	return
+
+*strrep2
+	return
+
+;//////// サブルーチン、割り込みイベント関係処理 ////////
+
+*colorDIV
+	;***** HSP Scriptの色分け処理 (簡易版) *****
+	notesel keybuf : notepos=0
+	repeat notemax
+		getstr tempstr,keybuf,notepos
+		if strmid(tempstr,0,1)=="#" {
+			; プリプロセッサ
+			Footy2AddEmphasis nID,tempstr,0,EMP_WORD,0,1,1,EMP_IND_BLANKS,HSP_PREPROCESS
+		}else{
+			; 命令、関数、システム変数等
+			; HSP_CMDCOLOR($0000F081)=EMP_IND_BLANKS | EMP_IND_PARENTHESIS | EMP_IND_OTHER_ASCII_SIGN
+			Footy2AddEmphasis nID,tempstr,0,EMP_WORD,0,1,1,HSP_CMDCOLOR,HSP_COMMAND
+		}
+		notepos+=strsize
+	loop
+	; コメント
+	;Footy2AddEmphasis nID, "/*", "*/",EMP_MULTI_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMENT
+	;Footy2AddEmphasis nID, ";", 0,EMP_LINE_AFTER,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMENT
+	Footy2AddEmphasis nID, "#", 0,EMP_LINE_AFTER,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMENT
+	; ラベル
+	;Footy2AddEmphasis nID, "*", 0,EMP_LINE_AFTER, EMPFLAG_HEAD,1,1,EMP_IND_ALLOW_ALL,HSP_LABEL
+	; 変数表示
+	Footy2AddEmphasis nID, "{", "}", EMP_MULTI_BETWEEN,0,2,-1,EMP_IND_ALLOW_ALL,HSP_DOBULEQUAT
+	; ""を文字列の中に入れたときの色
+	Footy2AddEmphasis nID, "\"\"", "\"\"", EMP_MULTI_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_BLOCK
+	; 変数を%%で囲ったときの色(反映方法がわかりません！)
+	Footy2AddEmphasis nID, "%", "%",EMP_MULTI_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,SKRIPT_VARIABLE
+	;***** 色分けを反映 *****
+	Footy2FlushEmphasis nID
+	return
+
+*keymode
+	;***** キーボード割り込み処理 *****
+	if wparam==0 : return
+	;***** Function キー*****
+	if wparam=112 : gosub *tokunget    ; F1
+	if wparam=115 : gosub *strfind     ; F4
+	;if wparam=116 : gosub *hspexec    ; F5
+	;if wparam=117 : gosub *XXXXXXX    ; F6
+	;if wparam=118 : gosub *XXXXXXX    ; F7
+	;if wparam=119 : gosub *XXXXXXX    ; F8
+	;if wparam=120 : gosub *XXXXXXX    ; F9
+
+	;***** Ctrl + アルファベットキー *****
+	getkey Ctrl,17   ;Ctrl Key
+	if Ctrl {
+		switch iparam
+			case 65 : gosub *selectall : swbreak		; Ctrl+A
+			case 66 : gosub *movelast  : swbreak		; Ctrl+B
+			case 67 : gosub *copy      : swbreak		; Ctrl+C
+			case 69 : gosub *strfind   : swbreak		; Ctrl+F
+			case 74 : gosub *moveother : swbreak		; Ctrl+J
+			case 78 : gosub *filenew   : swbreak		; Ctrl+N
+			case 79 : gosub *fileopen  : swbreak		; Ctrl+O
+			case 81 : gosub *owari     : swbreak		; Ctrl+Q
+			case 82 : gosub *strrep2   : swbreak		; Ctrl+R
+			case 83 : gosub *savenow   : swbreak		; Ctrl+S
+			case 84 : gosub *movetop   : swbreak		; Ctrl+T
+			case 86 : gosub *paste     : swbreak		; Ctrl+V
+			case 87 : gosub *selectcan : swbreak		; Ctrl+W
+			case 88 : gosub *cut       : swbreak		; Ctrl+X
+			case 89 : gosub *redo      : swbreak		; Ctrl+Y
+			case 90 : gosub *undo      : swbreak		; Ctrl+Z
+		swend
+	}
+	return
+
+*OnMenuCmd
+	;***** メニュー選択時の処理 (WM_COMMAND) *****
+	itemID=LOWORD(wparam)
+*PopSelect
+		switch itemID
+			;----- ファイル --------------------------------------------------------------
+			case 1100 : gosub *filenew   : swbreak		; 新規作成
+			case 1200 : gosub *fileopen  : swbreak		; 開く
+			case 1250 : gosub *savenow   : swbreak		; 上書き保存
+			case 1300 : gosub *filesave  : swbreak		; 名前を付けて保存
+			case 1900 : gosub *owari     : swbreak		; 閉じる
+			;----- 編集 ------------------------------------------------------------------
+			case 2000 : gosub *undo      : swbreak		; 元に戻す
+			case 2050 : gosub *redo      : swbreak		; やり直し
+			case 2100 : gosub *cut       : swbreak		; 切り取り
+			case 2200 : gosub *copy      : swbreak		; 複写
+			case 2300 : gosub *paste     : swbreak		; 貼り付け
+			case 2400 : gosub *cut       : swbreak		; 削除 (代用)
+			case 2500 : gosub *selectall : swbreak		; 全て選択
+			case 2600 :	gosub *selectcan : swbreak		; 全選択範囲の解除 (代用)
+			case 2700 : gosub *movetop   : swbreak		; 先頭行に移動
+			case 2800 : gosub *movelast  : swbreak		; 最終行に移動
+			case 2900 : gosub *moveother : swbreak		; 指定行に移動
+			;----- 検索 ------------------------------------------------------------------
+			case 3000 : swbreak							; 文字列の検索
+			case 3100 : swbreak							; 文字列の置換
+			;----- ＨＳＰ ----------------------------------------------------------------
+			/*
+			case 4000 : swbreak							; コンバイル＋実行
+			case 4100 : swbreak							; 実行
+			case 4200 : swbreak							; コンバイルのみ
+			case 4300 : swbreak							; エラー表示
+			case 4400 : swbreak							; オブジェクトファイル作成
+			case 4500 : swbreak							; START.AXァイル作成
+			;----- ツール ----------------------------------------------------------------
+			case 5000 : swbreak							; PACKFILE編集
+			case 5100 : swbreak							; DPMファイル作成
+			case 5200 : swbreak							; EXEファイル作成
+			case 5300 : swbreak							; ソースフォルダを開く
+			*/
+			;----- ヘルプ ----------------------------------------------------------------
+			case 6000
+				dialog "SkEditor v"+SkEditorVer+"\n\nFooty2 Version:"+GetFooty2Ver(),0,"Version Info"
+				gosub *Setforcus
+				swbreak
+				
+			default : swbreak
+		swend
+	return
+
+*OnMenuSelect
+	;***** メニュー選択時の処理 (WM_MENUSELECT) *****
+	if (wParam >> 16 == -1) & (lParam == 0) {
+		StsRsetsimple stshwnd
+	} else {
+		itemID=LOWORD(wparam)
+		stsmsg ="処理モード : "
+		switch itemID
+			;***** ファイル *****
+			case 1100 : stsmsg+=" 新規作成"                 : gosub *simplemode : swbreak
+			case 1200 :	stsmsg+=" 開く"                     : gosub *simplemode : swbreak
+			case 1250 : stsmsg+=" 上書き保存"               : gosub *simplemode : swbreak
+			case 1300 :	stsmsg+=" 名前を付けて保存"         : gosub *simplemode : swbreak
+			case 1900 :	stsmsg+=" 閉じる"                   : gosub *simplemode : swbreak
+			;***** 編集 *****
+			case 2000 : stsmsg+=" 元に戻す"                 : gosub *simplemode : swbreak
+			case 2050 :	stsmsg+=" やり直し"                 : gosub *simplemode : swbreak
+			case 2100 :	stsmsg+=" 切り取り"                 : gosub *simplemode : swbreak
+			case 2200 :	stsmsg+=" 複写"                     : gosub *simplemode : swbreak
+			case 2300 :	stsmsg+=" 貼り付け"                 : gosub *simplemode : swbreak
+			case 2400 : stsmsg+=" 削除"                     : gosub *simplemode : swbreak
+			case 2500 : stsmsg+=" 全て選択"                 : gosub *simplemode : swbreak
+			case 2600 : stsmsg+=" 全選択範囲の解除"         : gosub *simplemode : swbreak
+			case 2700 : stsmsg+=" 先頭行に移動"             : gosub *simplemode : swbreak
+			case 2800 : stsmsg+=" 最終行に移動"             : gosub *simplemode : swbreak
+			case 2900 : stsmsg+=" 指定行に移動"             : gosub *simplemode : swbreak
+			;***** 検索 *****
+			case 3000 :	stsmsg+=" 文字列の検索"             : gosub *simplemode : swbreak
+			case 3100 : stsmsg+=" 文字列の置換"             : gosub *simplemode : swbreak
+			/*;***** ＨＳＰ *****
+			case 4000 : stsmsg+=" コンバイル＋実行"         : gosub *simplemode : swbreak
+			case 4100 : stsmsg+=" 実行"                     : gosub *simplemode : swbreak
+			case 4200 :	stsmsg+=" コンバイルのみ"           : gosub *simplemode : swbreak
+			case 4300 : stsmsg+=" エラー表示"               : gosub *simplemode : swbreak
+			case 4400 :	stsmsg+=" オブジェクトファイル作成" : gosub *simplemode : swbreak
+			case 4500 : stsmsg+=" START.AXァイル作成"       : gosub *simplemode : swbreak
+			;***** ツール *****
+			case 5000 : stsmsg+=" PACKFILE編集"             : gosub *simplemode : swbreak
+			case 5100 : stsmsg+=" DPMファイル作成"          : gosub *simplemode : swbreak
+			case 5200 :	stsmsg+=" EXEファイル作成"          : gosub *simplemode : swbreak
+			case 5300 : stsmsg+=" ソースフォルダを開く"     : gosub *simplemode : swbreak
+			*/
+			;***** ヘルプ *****
+			case 6000 :	stsmsg+=" バージョン情報"           : gosub *simplemode : swbreak
+			default
+				stsmsg="" : gosub *simplemode : swbreak
+		swend
+	}
+	return
+
+*MenuProc
+	;***** メニューバーの設定処理 *****
+	;***** ファイル *****
+	hmenu(1)=Create_Menu(1)
+	Append_Menu "新規作成(&N)	Ctrl+N",1100
+	Insert_Menu 2,"",0,MF_SEPARATOR
+	Append_Menu "開く(&O)	Ctrl+O",1200
+	Append_Menu "上書き保存(&S)	Ctrl+S",1250
+	Append_Menu "名前を付けて保存",1300
+	Insert_Menu 6,"",0,MF_SEPARATOR
+	Append_Menu "終了(&Q)	Ctrl+Q",1900
+	;---------------------------------------------
+	;***** 編集 *****
+	hmenu(2)=Create_Menu(2)
+	Append_Menu "元に戻す(&U)	Ctrl+Z",2000
+	Append_Menu "やり直し(&R)	Ctrl+Y",2050
+	Append_Menu "コピー(&C)	Ctrl+C",2200
+	Append_Menu "切り取り(&T)	Ctrl+X",2100
+	Append_Menu "貼り付け(&P)	Ctrl+V",2300
+	Append_Menu "削除(&D)	Delete",2400
+	Insert_Menu 7,"",0,MF_SEPARATOR
+	Append_Menu "すべて選択(&A)	Ctrl+A",2500
+	Insert_Menu 9,"",0,MF_SEPARATOR
+	Append_Menu "選択の解除(&R)	Ctrl+W",2600
+	Append_Menu "先頭行に移動(&T)	Ctrl+T",2700
+	Append_Menu "最終行に移動(&B)	Ctrl+B",2800
+	Append_Menu "指定行に移動(&J)	Ctrl+J",2900
+	;---------------------------------------------
+	;***** 検索 *****
+	hmenu(3)=Create_Menu(3)
+	Append_Menu "文字列の検索(&F)	Ctrl+F/F4",3000
+	Append_Menu "文字列の置換(&R)	Ctrl+R",3100
+	;---------------------------------------------
+	;***** ＨＳＰ *****
+	/*hmenu(4)=Create_Menu(4)
+	Append_Menu "コンバイル＋実行(&C)	F5",4000
+	Append_Menu "実行(&R)	F6",4100
+	Append_Menu "コンバイルのみ(&P)	F7",4200
+	Append_Menu "エラー表示(&E)...	F8",4300
+	Append_Menu "オブジェクトファイル作成(&B)	F9",4400
+	Append_Menu "START.AXァイル作成(&S)",4500
+	
+	;---------------------------------------------
+	;***** ツール *****
+	hmenu(5)=Create_Menu(5)
+	Append_Menu "PACKFILE編集(&E)...",5000
+	Append_Menu "DPMファイル作成(&P)",5100
+	Append_Menu "EXEファイル作成(&M)...",5200
+	Insert_Menu 4,"",0,MF_SEPARATOR
+	Append_Menu "ソースフォルダを開く(&O)...",5300
+	*/
+	;---------------------------------------------
+	;***** ヘルプ *****
+	hmenu(6)=Create_Menu(6)
+	Append_Menu "バージョン情報",6000
+	;---------------------------------------------
+
+	;***** メニューバー *****
+	hmenu(0)=Create_Menu(0)
+	Append_Menu "ファイル(&F)",1,MF_POPUP
+	Append_Menu "編集(&E)",2,MF_POPUP
+	Append_Menu "検索(&S)",3,MF_POPUP
+	//Append_Menu "ＨＳＰ(&P)",4,MF_POPUP
+	//Append_Menu "ツール(&T)",5,MF_POPUP
+	Append_Menu "ヘルプ(&H)",6,MF_POPUP
+	SetMenumode 1
+	menu_h = GetSystemMetrics(15)
+	return
+
+
+*tokunget
+	;
+	sdim st,1024 : sdim outtoken,24
+	;現在カーソル位置の行の文字列を読みこむ
+	//st = Footy2GetLineA(int,int,sptr,int)
+	//a = Footy2GetLineLength(nID,nline)
+	gosub *GetLineInfo
+	;CaretLine,CaretPos
+	ret=Footy2GetText(nID,st,LM_CRLF,1024)
+	//nID sptr,lint,512
+	//ret = Footy2GetLineLength(nID,CaretLine)
+	
+	//ret = Footy2GetLine(nID,st,LM_CRLF,1024)
+	//dialog CaretLine+1
+	dialog ret
+	//dialog outtoken
+	//dialog npos,nline
+	
+	;p1=トークンが代入される変数
+	;p2=取得する文字列
+	;p3=取得する行数?
+	
+	;gettoken outtoken,"return deffunc 111111",7
+	;取得したキーワードを表示
+	;dialog " 取得されたキーワード : "+outtoken,0
+	return
+
+*simplemode
+	;***** ステータスバーに選択メッセージ表示 (シンプルモード) *****
+	StsSetsimple stshwnd,stsmsg
+	return
+
+*OnRbClick
+	;***** メッセージの処理 (WM_RBUTTONDOWN) *****
+	;※何故かFooty2上では、HSPからのマウスクリックイベントを受け付けない?
+	SelectMenu 2
+	TrackPopup_Menu -1,-1 : itemID=stat
+	gosub *PopSelect
+	return
+
+*SizeAdjust
+	;***** ウィンドウサイズ変更時の処理 *****
+	ret = Footy2Move(nID,INIX_pos,INIY_pos,ginfo_winx,ginfo_winy-sts_h)
+	sendmsg stshwnd,iparam,0,0
+	return
+
+*Setforcus
+	;***** フォーカス設定 *****
+	Footy2SetFocus nID,VIEWMODE_NORMAL
+	return
+
+*GetLineInfo
+	;***** 現在の行、位置を取得 *****
+	ret=Footy2GetCaretPosition(nID,CaretLine,CaretPos)
+	return
+
+*StatusProc
+	;***** ステータスバーの設定処理 *****
+	stshwnd=Createstsbar($100)
+	c=ginfo_winx-Def_WsizeY,200,-1
+	Stscell stshwnd,c,3
+	Stsinf stshwnd," ",0
+	Stsinf stshwnd," 挿入",1	
+	Stsinf stshwnd," SkEditor Ready!",2
+	dim rc,4 : GetWindowRect stshwnd,rc : sts_h = rc(3)-rc(1)
+	return
+
+*owari
+	;***** 終了処理 *****
+	ret = Footy2Delete(nID)
+	DestroyAllMenu
+	DestroyWindow stshwnd
+	end
