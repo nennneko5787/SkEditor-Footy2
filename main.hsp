@@ -7,9 +7,10 @@
 	#include "footy2nx.as"
 	#include "support.as"
 	#include "hscallbk.as"
+	#include "mod_fontdlg.as"
 
 	;***** SkEditor 定義 *****
-	#define SkEditorVer "0.0.4"
+	#define SkEditorVer "0.0.5"
 	
 	;***** 実行ファイル自動作成 ****
 	#packopt type 0
@@ -104,6 +105,24 @@
 
 	#const	SKRIPT_VARIABLE		RGB(0,255,255)		; %%囲みの変数
 
+	;***** 色分けに利用する定数(Minecraft ColorCode) *****
+	#const  MC_dark_red		RGB(170,0,0)				; 4
+	#const	MC_red			RGB(255,85,85)				; c
+	#const	MC_gold			RGB(255,170,0)				; 6
+	#const	MC_yellow		RGB(255,255,85)				; e
+	#const	MC_dark_green	RGB(0,170,0)				; 2
+	#const	MC_green		RGB(85,255,85)				; a
+	#const	MC_aqua			RGB(85,255,255)				; b
+	#const	MC_dark_aqua	RGB(0,170,170)				; 3
+	#const	MC_dark_blue	RGB(0,0,170)				; 1
+	#const	MC_blue			RGB(85,85,255)				; 9
+	#const	MC_light_purple	RGB(255,85,255)				; d
+	#const	MC_dark_purple	RGB(170,0,170)				; 5
+	#const	MC_white		RGB(255,255,255)			; f
+	#const	MC_gray			RGB(170,170,170)			; 7
+	#const	MC_dark_gray	RGB(85,85,85)				; 8
+	#const	MC_black		RGB(0,0,0)					; 0
+
 	;***** コールバック関数の関数形式を定義 *****
 	#uselib ""
 	#func Footy2SetFuncMoveCaretProc "" int,int,int,int
@@ -153,6 +172,19 @@
 
 	;***** Editorのフォント設定 *****
 	Footy2SetFontFace nID,FFM_ANSI_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_BALTIC_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_FFM_BIG5_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_EASTEUROPE_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_GB2312_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_GREEK_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_HANGUL_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_RUSSIAN_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_SHIFTJIS_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_TURKISH_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_VIETNAMESE_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_ARABIC_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_HEBREW_CHARSET,"MS Gothic",0
+	Footy2SetFontFace nID,FFM_THAI_CHARSET,"MS Gothic",0
 	Footy2SetFontSize nID,11,0
 
 	;***** Editorの各部の配色設定 *****
@@ -393,6 +425,7 @@
 	hunger
 	level
 	progress
+	sender
 "}
 
 		;***** ファイル消失時の定義ファイルを自動作成 *****
@@ -456,7 +489,7 @@
 
 *fileopen
 	;***** ファイルの選択と読み込み *****
-	dialog "hsp", 16 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
+	dialog "sk", 16 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
 	fname=refstr
 	if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
 		dialog "\""+fname+"\"の読み込みに失敗しました。",0 : return
@@ -470,9 +503,9 @@
 
 *filesave
 	;***** ファイルの保存 *****
-	dialog "hsp", 17 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
+	dialog "sk", 17 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
 	fname=refstr
-	if (Footy2SaveToFile(nID, fname, CSM_AUTOMATIC, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
+	if (Footy2SaveToFile(nID, fname, CSM_UTF8, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
 		dialog "\""+fname+"\"の保存に失敗しました。",0 : return
 	}
 	return
@@ -485,7 +518,7 @@
 
 *savenow
 	;***** ファイルの上書き保存 *****
-	if (Footy2SaveToFile(nID, fname, CSM_AUTOMATIC, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
+	if (Footy2SaveToFile(nID, fname, CSM_UTF8, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
 		gosub *filesave
 	}
 	return
@@ -571,7 +604,63 @@
 	; 変数を%%で囲ったときの色(反映方法がわかりません！)
 	Footy2AddEmphasis nID, "%", "%",EMP_LINE_BETWEEN,0,2,2,EMP_IND_ALLOW_ALL,SKRIPT_VARIABLE
 	; コマンドの定義
-	Footy2AddEmphasis nID, "/", ":",EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,SKRIPT_VARIABLE
+	Footy2AddEmphasis nID, "/", " ",EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMAND
+	; コマンドの定義
+	Footy2AddEmphasis nID, "/", ":",EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMAND
+	; コマンドの定義
+	Footy2AddEmphasis nID, "[<", ">]",EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMAND
+	; コマンドの定義
+	Footy2AddEmphasis nID, "<", ">",EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMAND
+	; Minecraftの色分け
+	; black
+	Footy2AddEmphasis nID, "&0", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_black
+	Footy2AddEmphasis nID, "§0", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_black
+	; dark_blue
+	Footy2AddEmphasis nID, "&1", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_blue
+	Footy2AddEmphasis nID, "§1", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_blue
+	; dark_green
+	Footy2AddEmphasis nID, "&2", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_green
+	Footy2AddEmphasis nID, "§2", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_green
+	; dark_aqua
+	Footy2AddEmphasis nID, "&3", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_aqua
+	Footy2AddEmphasis nID, "§3", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_aqua
+	; dark_red
+	Footy2AddEmphasis nID, "&4", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_red
+	Footy2AddEmphasis nID, "§4", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_red
+	; dark_purple
+	Footy2AddEmphasis nID, "&5", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_purple
+	Footy2AddEmphasis nID, "§5", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_purple
+	; gold
+	Footy2AddEmphasis nID, "&6", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_gold
+	Footy2AddEmphasis nID, "§6", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_gold
+	; gray
+	Footy2AddEmphasis nID, "&7", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_gray
+	Footy2AddEmphasis nID, "§7", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_gray
+	; dark_gray
+	Footy2AddEmphasis nID, "&8", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_gray
+	Footy2AddEmphasis nID, "§8", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_dark_gray
+	; blue
+	Footy2AddEmphasis nID, "&9", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_blue
+	Footy2AddEmphasis nID, "§9", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_blue
+	; green
+	Footy2AddEmphasis nID, "&a", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_green
+	Footy2AddEmphasis nID, "§a", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_green
+	; aqua
+	Footy2AddEmphasis nID, "&b", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_aqua
+	Footy2AddEmphasis nID, "§b", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_aqua
+	; red
+	Footy2AddEmphasis nID, "&c", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_red
+	Footy2AddEmphasis nID, "§c", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_red
+	; light_purple
+	Footy2AddEmphasis nID, "&d", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_light_purple
+	Footy2AddEmphasis nID, "§d", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_light_purple
+	; yellow
+	Footy2AddEmphasis nID, "&e", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_yellow
+	Footy2AddEmphasis nID, "§e", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_yellow
+	; white
+	Footy2AddEmphasis nID, "&f", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_white
+	Footy2AddEmphasis nID, "§f", 0,EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,MC_white
+
 	;***** 色分けを反映 *****
 	Footy2FlushEmphasis nID
 	return
@@ -638,6 +727,9 @@
 			;----- 検索 ------------------------------------------------------------------
 			case 3000 : swbreak							; 文字列の検索
 			case 3100 : swbreak							; 文字列の置換
+			;----- 設定 ------------------------------------------------------------------
+			case 4000 : gosub *selfont : swbreak							; フォント変更
+			case 4100 : gosub *relfile : swbreak							; 構文定義ファイルの再読み込み
 			;----- ＨＳＰ ----------------------------------------------------------------
 			/*
 			case 4000 : swbreak							; コンバイル＋実行
@@ -691,6 +783,9 @@
 			;***** 検索 *****
 			case 3000 :	stsmsg+=" 文字列の検索"             : gosub *simplemode : swbreak
 			case 3100 : stsmsg+=" 文字列の置換"             : gosub *simplemode : swbreak
+			;***** 設定 *****
+			case 4000 : stsmsg+=" フォント変更"         : gosub *simplemode : swbreak
+			case 4100 : stsmsg+=" 構文定義ファイルの再読み込み" : gosub *simplemode : swbreak
 			/*;***** ＨＳＰ *****
 			case 4000 : stsmsg+=" コンバイル＋実行"         : gosub *simplemode : swbreak
 			case 4100 : stsmsg+=" 実行"                     : gosub *simplemode : swbreak
@@ -745,6 +840,11 @@
 	Append_Menu "文字列の検索(&F)	Ctrl+F/F4",3000
 	Append_Menu "文字列の置換(&R)	Ctrl+R",3100
 	;---------------------------------------------
+	;***** 設定 *****
+	hmenu(4)=Create_Menu(4)
+	Append_Menu "フォント変更(&F)",4000
+	Append_Menu "構文定義ファイルの再読み込み(&T)",4100
+	;---------------------------------------------
 	;***** ＨＳＰ *****
 	/*hmenu(4)=Create_Menu(4)
 	Append_Menu "コンバイル＋実行(&C)	F5",4000
@@ -753,7 +853,6 @@
 	Append_Menu "エラー表示(&E)...	F8",4300
 	Append_Menu "オブジェクトファイル作成(&B)	F9",4400
 	Append_Menu "START.AXァイル作成(&S)",4500
-	
 	;---------------------------------------------
 	;***** ツール *****
 	hmenu(5)=Create_Menu(5)
@@ -774,6 +873,7 @@
 	Append_Menu "ファイル(&F)",1,MF_POPUP
 	Append_Menu "編集(&E)",2,MF_POPUP
 	Append_Menu "検索(&S)",3,MF_POPUP
+	Append_Menu "設定(&P)",4,MF_POPUP
 	//Append_Menu "ＨＳＰ(&P)",4,MF_POPUP
 	//Append_Menu "ツール(&T)",5,MF_POPUP
 	Append_Menu "ヘルプ(&H)",6,MF_POPUP
@@ -781,6 +881,59 @@
 	menu_h = GetSystemMetrics(15)
 	return
 
+*selfont
+	dim result, 8
+	fontdlg result, 0
+	/*
+	mes "フォント名 : " + refstr
+	mes "フォントサイズ（HSPで利用する論理サイズ）：" + result(0)
+	mes "フォント書体 : " + result(1)
+	pos 40 : mes "0 = 通常\n1 = 太字\n2 = 斜体\n3 = 太字斜体"
+	pos  0 : mes "フォントサイズ（pt） : " + result(2)
+	mes "フォントカラー（赤） : " + result(3)
+	mes "フォントカラー（緑） : " + result(4)
+	mes "フォントカラー（青） : " + result(5)
+	mes "下線の有無 : " + result(6)
+	mes "打ち消し線の有無 : " + result(7)
+	*/
+	if stat == 0 {
+		stsmsg+=" に失敗しました。"
+		gosub *simplemode
+		return
+	}
+	Footy2SetFontFace nID,FFM_ANSI_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_BALTIC_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_FFM_BIG5_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_EASTEUROPE_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_GB2312_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_GREEK_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_HANGUL_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_RUSSIAN_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_SHIFTJIS_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_TURKISH_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_VIETNAMESE_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_ARABIC_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_HEBREW_CHARSET,refstr,0
+	Footy2SetFontFace nID,FFM_THAI_CHARSET,refstr,0
+	Footy2SetFontSize nID,result(0),1
+	font refstr,result(0)
+	stsmsg+=" が完了しました。"
+	gosub *simplemode
+	return
+
+*relfile
+	exist Startdir+"stdkeyword.txt"
+	if strsize ==-1 {
+		stsmsg+=" に失敗しました。新たな構文定義ファイルを作成します。"
+		gosub *innertbl
+	} else {
+		;***** 通常の定義ファイル読み込み処理 *****
+		sdim keybuf,strsize+64
+		bload Startdir+"stdkeyword.txt",keybuf,strsize
+	}
+	stsmsg+=" が完了しました。"
+	gosub *simplemode
+	return
 
 *tokunget
 	;
@@ -790,13 +943,14 @@
 	//a = Footy2GetLineLength(nID,nline)
 	gosub *GetLineInfo
 	;CaretLine,CaretPos
-	ret=Footy2GetText(nID,st,LM_CRLF,1024)
+	ret=Footy2GetSelText(nID,st,LM_CRLF,1024)
 	//nID sptr,lint,512
 	//ret = Footy2GetLineLength(nID,CaretLine)
 	
 	//ret = Footy2GetLine(nID,st,LM_CRLF,1024)
 	//dialog CaretLine+1
 	dialog ret
+	dialog st(0)
 	//dialog outtoken
 	//dialog npos,nline
 	
