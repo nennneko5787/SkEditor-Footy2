@@ -357,31 +357,42 @@
 
 		getkey BSC,8
 		getkey Space,32
-		if (BSC != 1) or (Space != 1){
+		if (BSC == 0) or (Space == 0){
 			gosub *GetLineInfo
 			;CaretLine,CaretPos
 			;SetWindowPos hwnd1, HWND_TOP, CaretPos, CaretLine(1) + 17, 0, 0, SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOSIZE
 			gsel 1
 			sdim st,1024
 			sdim stt,1024
-			sdim tmp
 			ret=Footy2GetText(nID,varptr(st),LM_CRLF,1024)
+			strrep st,"\t",""
 			split st,"\n",stt
 			logmes ret
 			ab = ""
 			aa = keybuf
-			strrep st,"\t",""
 			strrep aa,"\t",""
 			notesel aa
+
+			split stt(CaretLine)," ",tmp
+			if stat == 0{
+				tmp(0) = stt
+				tmptmp = 0
+			}else{
+				if length(tmp) == 1{
+					tmptmp = 0
+					;dialog length(tmp)
+				}else{
+					if length(tmp) == 2{
+						tmptmp = length(tmp) - 1
+						;dialog length(tmp)
+					}
+				}
+			}else{
+				tmptmp = length(tmp) - 1
+				dialog length(tmp)
+			}
 			repeat notemax
 				noteget tempstr,cnt
-				split stt(CaretLine)," ",tmp
-				if stat == 0{
-					tmp(0) = stt
-					tmptmp = 0
-				}else{
-					tmptmp = length(tmp)
-				}
 				;dialog tmptmp
 				; 命令、関数、システム変数等
 				; HSP_CMDCOLOR($0000F081)=EMP_IND_BLANKS | EMP_IND_PARENTHESIS | EMP_IND_OTHER_ASCII_SIGN

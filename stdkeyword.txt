@@ -31,8 +31,6 @@ loop-item
 send
 message
 broadcast
-join
-quit
 if
 is
 greater than
