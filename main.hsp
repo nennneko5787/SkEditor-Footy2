@@ -11,9 +11,10 @@
 	#include "mod_fontdlg.as"
 
 	;***** SkEditor 定義 *****
-	#define SkEditorVer "v0.0.5.1"
+	#define SkEditorVer "v0.0.6"
 	
 	;***** 実行ファイル自動作成 ****
+	#epack "stdkeyword.txt"
 	#packopt type 0
 	#packopt name "SkEditor"
 	#packopt runtime "hsprt"
@@ -63,6 +64,7 @@
 	#cfunc  GetSystemMetrics "GetSystemMetrics" int
 	#func   DestroyWindow "DestroyWindow" int
 	#func   GetWindowRect "GetWindowRect" int,var
+	#func 	SetWindowPos "SetWindowPos" sptr,sptr,sptr,sptr,sptr,sptr,sptr
 
 	;***** オーバーラップウィンドウ作成用マクロ *****
 	#define GWL_STYLE			-16
@@ -81,6 +83,13 @@
 	#define WM_RBUTTONDOWN		$00000204
 	#define WM_MENUSELECT		$0000011F
 	#define WM_DROPFILES		$00000233	
+
+	#const SWP_NOACTIVATE		$00000010
+	#const SWP_NOSIZE			$00000001
+	#const SWP_NOMOVE			$00000002
+	#const SWP_NOZORDER			$00000004
+	#const SWP_NOOWNERZORDER	$00000200
+	#const SWP_FRAMECHANGED		$00000020
 
 	;***** 内部利用定数 *****
 	#const  INIX_pos			0					; Footy2 Edit Control初期位置(X)
@@ -173,7 +182,7 @@
 
 	exist Startdir+"stdkeyword.txt"
 	if strsize ==-1 {
-		dialog "Skript構文定義ファイルの読み込みに失敗しました。",0
+		dialog "Skript構文定義ファイルの読み込みに失敗しました。新たな構文定義ファイルを作成します。",0
 		gosub *innertbl
 	} else {
 		;***** 通常の定義ファイル読み込み処理 *****
@@ -260,6 +269,12 @@
 			title titlename+getpath(fname,8)
 		}
 	}
+
+	bgscr 1,ginfo_dispx,ginfo_dispy,0,0,0
+	;gsel 1,-1
+	width 240,320,0,0
+	hwnd1 = hwnd
+	gsel 0
 	stop
 
 *drop
@@ -339,6 +354,51 @@
 				swbreak
 		swend
 		Stsinf stshwnd,stsmsg,2
+
+		getkey BSC,8
+		getkey Space,32
+		if (BSC != 1) or (Space != 1){
+			gosub *GetLineInfo
+			;CaretLine,CaretPos
+			;SetWindowPos hwnd1, HWND_TOP, CaretPos, CaretLine(1) + 17, 0, 0, SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOSIZE
+			gsel 1
+			sdim st,1024
+			sdim stt,1024
+			sdim tmp
+			ret=Footy2GetText(nID,varptr(st),LM_CRLF,1024)
+			split st,"\n",stt
+			logmes ret
+			ab = ""
+			aa = keybuf
+			strrep st,"\t",""
+			strrep aa,"\t",""
+			notesel aa
+			repeat notemax
+				noteget tempstr,cnt
+				split stt(CaretLine)," ",tmp
+				if stat == 0{
+					tmp(0) = stt
+					tmptmp = 0
+				}else{
+					tmptmp = length(tmp)
+				}
+				;dialog tmptmp
+				; 命令、関数、システム変数等
+				; HSP_CMDCOLOR($0000F081)=EMP_IND_BLANKS | EMP_IND_PARENTHESIS | EMP_IND_OTHER_ASCII_SIGN
+				; if instr(stt(CaretLine),0,tempstr) != -1{
+				if (instr(tempstr,CaretPos,tmp(tmptmp)) != -1) or (tempstr == tmp(tmptmp)){
+					ab += str(tempstr + "\n")
+					logmes "ヒット: "+tempstr
+					//k = cnt
+				}else{
+					logmes "ノーヒット: "+tempstr
+				}
+			loop
+			pos 0,0
+			objsize 240,220
+			listbox k,100,ab
+			SetWindowPos hwnd1,0,CaretPos * 10,CaretLine * 20 + 70,240,320,SWP_NOACTIVATE | SWP_SHOWWINDOW
+		}
 	return
 
 *OnSetFuncInsertModeChangedProc
@@ -354,104 +414,15 @@
 *innertbl
 	;***** 内部HSP標準命令定義テーブル *****
 	sdim keybuf : keybuf=""
-	keybuf == {"on
-	break
-	place
-	join
-	quit
-	drop
-	pick up
-	chat
-	damage
-	death
-	command
-	set
-	add
-	remove
-	from
-	loop
-	all
-	player
-	players
-	block
-	blocks
-	item
-	items
-	entity
-	entities
-	loop-player
-	loop-entity
-	loop-block
-	loop-item
-	send
-	message
-	broadcast
-	join
-	quit
-	if
-	is
-	greater than
-	less than
-	equal
-	or
-	and
-	every
-	year
-	years
-	months
-	month
-	days
-	day
-	hours
-	hour
-	minutes
-	minute
-	seconds
-	second
-	ticks
-	tick
-	loop
-	times
-	full
-	size of
-	number of
-	text
-	number
-	integer
-	item
-	items
-		description:
-		usage:
-		permission:
-		permission message:
-		executable by:
-		aliases:
-		trigger:
-	title
-	with
-	subtitle
-	action
-	bar
-	actionbar
-	tablist
-	tab
-	list
-	name
-	display
-	nickname
-	prefix
-	suffix
-	location
-	health
-	max
-	hunger
-	level
-	progress
-	sender
-"}
+	// パックファイルから展開
+	exist dir_cur+"\\stdkeyword.txt"
+	if strsize=-1{
+		bcopy "stdkeyword.txt",""+dir_cur+"\\stdkeyword.txt"
+	}
 
-		;***** ファイル消失時の定義ファイルを自動作成 *****
-		bsave Startdir+"stdkeyword.txt",keybuf
+	exist Startdir+"stdkeyword.txt"
+	sdim keybuf,strsize+64
+	bload Startdir+"stdkeyword.txt",keybuf,strsize
 	return
 
 *editcolorset
@@ -965,14 +936,14 @@
 	//a = Footy2GetLineLength(nID,nline)
 	gosub *GetLineInfo
 	;CaretLine,CaretPos
-	ret=Footy2GetSelText(nID,st,LM_CRLF,1024)
+	ret=Footy2GetSelText(nID,varptr(st),LM_CRLF,1024)
 	//nID sptr,lint,512
 	//ret = Footy2GetLineLength(nID,CaretLine)
 	
 	//ret = Footy2GetLine(nID,st,LM_CRLF,1024)
 	//dialog CaretLine+1
-	dialog ret
-	dialog st(0)
+	//dialog st
+	exec "https://skripthub.net/docs/?search="+st,16
 	//dialog outtoken
 	//dialog npos,nline
 	
