@@ -9,7 +9,7 @@
 	#include "hscallbk.as"
 
 	;***** SkEditor 定義 *****
-	#define SkEditorVer "0.0.3"
+	#define SkEditorVer "0.0.4"
 	
 	;***** 実行ファイル自動作成 ****
 	#packopt type 0
@@ -197,7 +197,7 @@
 		fname=dir_cmdline
 		strrep fname,"\"",""
 		if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
-			dialog "ファイルの読み込みに失敗しました。\n"+dir_cmdline,0
+			dialog "\""+dir_cmdline+"\"の読み込みに失敗しました。",0
 		}else{
 			gosub *colorDIV
 			Footy2SetFocus nID,VIEWMODE_NORMAL : Footy2Refresh nID
@@ -298,45 +298,105 @@
 	return
 
 *innertbl
-		;***** 内部HSP標準命令定義テーブル *****
-		sdim keybuf : keybuf=""
-		keybuf += "comevdisp\ncomevarg\ncomevent\ndelcom\nnewcom\nquerycom\nsarrayconv\n"
-		keybuf += "assert\nlogmes\nbutton\nchkbox\nclrobj\ncombox\ninput\nlistbox\n"
-		keybuf += "mesbox\nobjmode\nobjprm\nobjsel\nobjsize\ncnt\ndir_cmdline\ndir_cur\n"
-		keybuf += "dir_desktop\ndir_exe\ndir_mydoc\ndir_sys\ndir_win\nerr\nginfo_act\n"
-		keybuf += "ginfo_b\nginfo_cx\nginfo_cy\nginfo_dispx\nginfo_dispy\nginfo_g\n"
-		keybuf += "ginfo_intid\nginfo_mesx\nginfo_mesy\nginfo_mx\nginfo_my\nginfo_paluse\n"
-		keybuf += "ginfo_r\nginfo_sel\nginfo_sizex\nginfo_sizey\nginfo_sx\nginfo_sy\n"
-		keybuf += "ginfo_vx\nginfo_vy\nginfo_winx\nginfo_winy\nginfo_wx1\nginfo_wx2\n"
-		keybuf += "ginfo_wy1\nginfo_wy2\nhdc\nhinstance\nhspstat\nhspver\nhwnd\niparam\n"
-		keybuf += "looplev\nlparam\nmousew\nmousex\nmousey\nmsgothic\nmsmincho\nnotemax\n"
-		keybuf += "notesize\nrefdval\nrefstr\nstat\nstrsize\nsublev\nthismod\nwparam\n"
-		keybuf += "bcopy\nbload\nbsave\nchdir\nchdpm\ndelete\ndirlist\nexist\nmemfile\n"
-		keybuf += "mkdir\n#addition\n#aht\n#ahtmes\n#cfunc\n#cmd\n#cmpopt\n#comfunc\n"
-		keybuf += "#const\n#defcfunc\n#deffunc\n#define\n#else\n#endif\n#enum\n#epack\n"
-		keybuf += "#func\n#global\n#if\n#ifdef\n#ifndef\n#include\n#modfunc\n#modinit\n"
-		keybuf += "#modterm\n#module\n#pack\n#packopt\n#regcmd\n#runtime\n#undef\n#usecom\n"
-		keybuf += "#uselib\n_break\n_continue\ncase\ndefault\ndo\nfor\nnext\nswbreak\n"
-		keybuf += "swend\nswitch\nuntil\nwend\nwhile\nawait\nbreak\ncontinue\nend\nexec\n"
-		keybuf += "exgoto\nforeach\ngosub\ngoto\nif\nloop\non\nonclick\noncmd\nonerror\n"
-		keybuf += "onexit\nonkey\nrepeat\nreturn\nrun\nstop\nwait\nmci\nmmload\nmmplay\n"
-		keybuf += "mmstop\nlpeek\npeek\nwpeek\nalloc\ncomres\nddim\ndelmod\ndim\ndimtype\n"
-		keybuf += "lpoke\nmemcpy\nmemexpand\nmemset\nnewmod\npoke\nsdim\nwpoke\naxobj\n"
-		keybuf += "bgscr\nbmpsave\nboxf\nbuffer\nchgdisp\ncircle\ncls\ncolor\ndialog\n"
-		keybuf += "font\ngcopy\ngmode\ngrect\ngroll\ngrotate\ngsel\ngsquare\ngzoom\n"
-		keybuf += "hsvcolor\nline\nmes\npalcolor\npalette\npget\npicload\npos\nprint\n"
-		keybuf += "pset\nredraw\nscreen\nsendmsg\nsyscolor\nsysfont\ntitle\nwidth\n"
-		keybuf += "winobj\nabs\nabsf\natan\ncallfunc\ncos\ndirinfo\ndouble\nexpf\ngettime\n"
-		keybuf += "ginfo\nint\nlength\nlength2\nlength3\nlength4\nlibptr\nlimit\nlimitf\n"
-		keybuf += "logf\nobjinfo\nrnd\nsin\nsqrt\nstr\nstrlen\nsysinfo\ntan\nvarptr\nvartype\n"
-		keybuf += "varuse\ngetkey\nmcall\nmouse\nrandomize\nstick\ndup\ndupptr\nmref\nand\n"
-		keybuf += "not\nor\nxor\ncnvwtos\ngetpath\ninstr\nnoteinfo\nstrf\nstrmid\ncnvstow\n"
-		keybuf += "getstr\nnoteadd\nnotedel\nnoteget\nnoteload\nnotesave\nnotesel\nnoteunsel\n"
-		keybuf += "sptr\nwstr\nwptr\nvar\narray\ndouble\nlabel\nfloat\npval\ncomobj\nbmscr\n"
-		keybuf += "prefstr\npexinfo\nnullptr\nctype\nglobal\nelse\n"
+	;***** 内部HSP標準命令定義テーブル *****
+	sdim keybuf : keybuf=""
+	keybuf == {"on
+	break
+	place
+	join
+	quit
+	drop
+	pick up
+	chat
+	damage
+	death
+	command
+	set
+	add
+	remove
+	from
+	loop
+	all
+	player
+	players
+	block
+	blocks
+	item
+	items
+	entity
+	entities
+	loop-player
+	loop-entity
+	loop-block
+	loop-item
+	send
+	message
+	broadcast
+	join
+	quit
+	if
+	is
+	greater than
+	less than
+	equal
+	or
+	and
+	every
+	year
+	years
+	months
+	month
+	days
+	day
+	hours
+	hour
+	minutes
+	minute
+	seconds
+	second
+	ticks
+	tick
+	loop
+	times
+	full
+	size of
+	number of
+	text
+	number
+	integer
+	item
+	items
+		description:
+		usage:
+		permission:
+		permission message:
+		executable by:
+		aliases:
+		trigger:
+	title
+	with
+	subtitle
+	action
+	bar
+	actionbar
+	tablist
+	tab
+	list
+	name
+	display
+	nickname
+	prefix
+	suffix
+	location
+	health
+	max
+	hunger
+	level
+	progress
+"}
 
 		;***** ファイル消失時の定義ファイルを自動作成 *****
-		;bsave Startdir+"stdkeyword.txt",keybuf
+		bsave Startdir+"stdkeyword.txt",keybuf
 	return
 
 *editcolorset
@@ -385,7 +445,7 @@
 	gosub *filenew
 	fname=ccbuf
 	if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
-		dialog "ファイルの読み込みに失敗しました。",0 : return
+		dialog "\""+fname+"\"の読み込みに失敗しました。",0 : return
 	}
 	gosub *colorDIV
 	Footy2SetFocus nID,VIEWMODE_NORMAL : Footy2Refresh nID
@@ -399,7 +459,7 @@
 	dialog "hsp", 16 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
 	fname=refstr
 	if (Footy2TextFromFile(nID, fname, CSM_AUTOMATIC) != FOOTY2ERR_NONE) {
-		dialog "ファイルの読み込みに失敗しました。",0 : return
+		dialog "\""+fname+"\"の読み込みに失敗しました。",0 : return
 	}
 	gosub *colorDIV
 	Footy2SetFocus nID,VIEWMODE_NORMAL : Footy2Refresh nID
@@ -413,7 +473,7 @@
 	dialog "hsp", 17 : if stat == 0  { Footy2SetFocus nID,VIEWMODE_NORMAL : stop }
 	fname=refstr
 	if (Footy2SaveToFile(nID, fname, CSM_AUTOMATIC, LM_AUTOMATIC) != FOOTY2ERR_NONE) {
-		dialog "ファイルの保存に失敗しました。",0 : return
+		dialog "\""+fname+"\"の保存に失敗しました。",0 : return
 	}
 	return
 
@@ -502,12 +562,16 @@
 	Footy2AddEmphasis nID, "#", 0,EMP_LINE_AFTER,0,1,1,EMP_IND_ALLOW_ALL,HSP_COMMENT
 	; ラベル
 	;Footy2AddEmphasis nID, "*", 0,EMP_LINE_AFTER, EMPFLAG_HEAD,1,1,EMP_IND_ALLOW_ALL,HSP_LABEL
+	; ダブルコーテーション囲み範囲文字列
+	Footy2AddEmphasis nID, "\"", "\"", EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_BLOCK
 	; 変数表示
-	Footy2AddEmphasis nID, "{", "}", EMP_MULTI_BETWEEN,0,2,-1,EMP_IND_ALLOW_ALL,HSP_DOBULEQUAT
+	Footy2AddEmphasis nID, "{", "}", EMP_LINE_BETWEEN,0,2,-1,EMP_IND_ALLOW_ALL,HSP_DOBULEQUAT
 	; ""を文字列の中に入れたときの色
-	Footy2AddEmphasis nID, "\"\"", "\"\"", EMP_MULTI_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,HSP_BLOCK
+	Footy2AddEmphasis nID, "\"\"", "\"\"",EMP_WORD,0,2,2,EMP_IND_ALLOW_ALL,HSP_SINGLEQUAT
 	; 変数を%%で囲ったときの色(反映方法がわかりません！)
-	Footy2AddEmphasis nID, "%", "%",EMP_MULTI_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,SKRIPT_VARIABLE
+	Footy2AddEmphasis nID, "%", "%",EMP_LINE_BETWEEN,0,2,2,EMP_IND_ALLOW_ALL,SKRIPT_VARIABLE
+	; コマンドの定義
+	Footy2AddEmphasis nID, "/", ":",EMP_LINE_BETWEEN,0,1,1,EMP_IND_ALLOW_ALL,SKRIPT_VARIABLE
 	;***** 色分けを反映 *****
 	Footy2FlushEmphasis nID
 	return

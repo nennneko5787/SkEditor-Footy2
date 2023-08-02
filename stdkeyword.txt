@@ -17,8 +17,16 @@ loop
 all
 player
 players
+block
+blocks
+item
+items
 entity
 entities
+loop-player
+loop-entity
+loop-block
+loop-item
 send
 message
 broadcast
@@ -51,3 +59,35 @@ times
 full
 size of
 number of
+text
+number
+integer
+item
+items
+	description:
+	usage:
+	permission:
+	permission message:
+	executable by:
+	aliases:
+	trigger:
+title
+with
+subtitle
+action
+bar
+actionbar
+tablist
+tab
+list
+name
+display
+nickname
+prefix
+suffix
+location
+health
+max
+hunger
+level
+progress
