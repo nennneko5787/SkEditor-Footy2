@@ -4,19 +4,21 @@
 	;                                                        HSP-NEXT Sakura
 	;============================================================================
 
+	#include "hspinet.as"
 	#include "footy2nx.as"
 	#include "support.as"
 	#include "hscallbk.as"
 	#include "mod_fontdlg.as"
 
 	;***** SkEditor 定義 *****
-	#define SkEditorVer "0.0.5"
+	#define SkEditorVer "v0.0.6"
 	
 	;***** 実行ファイル自動作成 ****
 	#packopt type 0
 	#packopt name "SkEditor"
 	#packopt runtime "hsprt"
 	#packopt hide 1
+	#packopt version "version.txt"
 
 	#module
 	;***** カーソル位置のトークンを取得 *****
@@ -135,6 +137,26 @@
 	setcallbk Proc2, Footy2SetFuncInsertModeChanged, *OnSetFuncInsertModeChangedProc
 
 	;***** 画面作成 *****
+	netinit
+	neturl "https://api.github.com/repos/nennneko5787/SkEditor/releases/"
+	netrequest_get "latest"
+	;	結果待ちのためのループ
+	repeat
+	netexec res
+	if res : break
+	await
+	loop
+	netgetv json
+	jsonopen pointer,json
+	jsongets ver,"tag_name",pointer
+	if ver != SkEditorVer {
+		dialog "新しいバージョン「" + ver + "」がリリースされています！\nGithubに移動して、新しいバージョンをインストールしますか?",2,"SkEditor"
+		if stat == 6 {
+			exec "https://github.com/nennneko5787/SkEditor/releases/latest/",16
+			end
+		}
+	}
+
 	screen 0,ginfo_dispx,ginfo_dispy,2,,,Def_WsizeX,Def_WsizeY : overrapwin
 	color : boxf : sdim fname,MAX_PATH
 
@@ -746,7 +768,7 @@
 			*/
 			;----- ヘルプ ----------------------------------------------------------------
 			case 6000
-				dialog "SkEditor v"+SkEditorVer+"\n\nFooty2 Version:"+GetFooty2Ver(),0,"Version Info"
+				dialog "SkEditor "+SkEditorVer+"\n\nFooty2 Version:"+GetFooty2Ver(),0,"Version Info"
 				gosub *Setforcus
 				swbreak
 				
