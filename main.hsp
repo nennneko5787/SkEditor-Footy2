@@ -364,10 +364,11 @@
 			gsel 1
 			sdim st,1024
 			sdim stt,1024
+			sdim tmp,1024
 			ret=Footy2GetText(nID,varptr(st),LM_CRLF,1024)
 			strrep st,"\t",""
 			split st,"\n",stt
-			logmes ret
+			;logmes ret
 			ab = ""
 			aa = keybuf
 			strrep aa,"\t",""
@@ -389,8 +390,9 @@
 				}
 			}else{
 				tmptmp = length(tmp) - 1
-				dialog length(tmp)
+				;dialog length(tmp)
 			}
+			logmes length(tmp)
 			repeat notemax
 				noteget tempstr,cnt
 				;dialog tmptmp
@@ -401,9 +403,9 @@
 					ab += str(tempstr + "\n")
 					logmes "ÉqÉbÉg: "+tempstr
 					//k = cnt
-				}else{
+				}/*else{
 					logmes "ÉmÅ[ÉqÉbÉg: "+tempstr
-				}
+				}*/
 			loop
 			pos 0,0
 			objsize 240,220
