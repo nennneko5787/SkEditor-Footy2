@@ -1,11 +1,11 @@
-_FILEVERSION=0.0.6
-_PRODUCTVERSION=0.0.6
+_FILEVERSION=0.0.5a
+_PRODUCTVERSION=0.0.5a
 Comments=Skriptをわかりやすく書けることだけに重点を置いたエディタです。
 CompanyName=nennneko5787
 FileDescription=Skriptをわかりやすく書けることだけに重点を置いたエディタです。
-FileVersion=0.0.6
+FileVersion=0.0.5a
 InternalName=SkEditor
 LegalCopyright=SkriptLang Team
 OriginalFilename=SkEditor.exe
 ProductName=SkEditor
-ProductVersion=0.0.6
+ProductVersion=0.0.5a
