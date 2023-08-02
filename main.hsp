@@ -11,7 +11,7 @@
 	#include "mod_fontdlg.as"
 
 	;***** SkEditor 定義 *****
-	#define SkEditorVer "v0.0.5a"
+	#define SkEditorVer "v0.0.5.1"
 	
 	;***** 実行ファイル自動作成 ****
 	#packopt type 0
