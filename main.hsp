@@ -9,6 +9,7 @@
 	#include "support.as"
 	#include "hscallbk.as"
 	#include "mod_fontdlg.as"
+	#include "hspini.as"
 
 	;***** SkEditor 定義 *****
 	#define SkEditorVer "v0.0.6"
@@ -65,6 +66,8 @@
 	#func   DestroyWindow "DestroyWindow" int
 	#func   GetWindowRect "GetWindowRect" int,var
 	#func 	SetWindowPos "SetWindowPos" sptr,sptr,sptr,sptr,sptr,sptr,sptr
+	#func SetLayered "SetLayeredWindowAttributes" int , int , int , int
+	#func  ClientToScreen "ClientToScreen" sptr, sptr
 
 	;***** オーバーラップウィンドウ作成用マクロ *****
 	#define GWL_STYLE			-16
@@ -91,8 +94,11 @@
 	#const SWP_NOOWNERZORDER	$00000200
 	#const SWP_FRAMECHANGED		$00000020
 
+	#define  WS_EX_TRANSPARENT		$00000020
+	#define WS_EX_LAYERED			$00080000
+
 	;***** 内部利用定数 *****
-	#const  INIX_pos			0					; Footy2 Edit Control初期位置(X)
+	#const  INIX_pos			300					; Footy2 Edit Control初期位置(X)
 	#const  INIY_pos			0					; Footy2 Edit Control初期位置(Y)
 	#const  Def_WsizeX			640					; screen size default (X)
 	#const  Def_WsizeY			480					; screen size default (Y)
@@ -166,6 +172,19 @@
 		}
 	}
 
+	//設定をロードしてみる
+    ini_setpath "./SkEditor.ini"
+	exist "./SkEditor.ini"
+	if strsize == -1 {
+		ini_puts "Editor", "Font", "MS Gothic"
+		ini_puti "Editor", "FontSize", 11
+		ini_puti "Editor", "FontRSize", 11
+	}
+    
+	seltfont = ini_gets("Editor","Font","MS Gothic")
+	fontsize = ini_geti("Editor","FontSize",11)
+	fontRsize = ini_geti("Editor","FontRSize",11)
+
 	screen 0,ginfo_dispx,ginfo_dispy,2,,,Def_WsizeX,Def_WsizeY : overrapwin
 	color : boxf : sdim fname,MAX_PATH
 
@@ -195,28 +214,28 @@
 	gosub *StatusProc
 
 	;***** Footy2 Edit Control作成 *****
-	nID=Footy2Create(hwnd,INIX_pos,INIY_pos,ginfo_winx,ginfo_winy-menu_h-sts_h,VIEWMODE_NORMAL)
+	nID=Footy2Create(hwnd,INIX_pos,INIY_pos,ginfo_winx-300,ginfo_winy-menu_h-sts_h,VIEWMODE_NORMAL)
 	if ( nID != FOOTY2ERR_NONE ) : end
 
 	;***** 現在のFooty2 Windowのハンドル取得 *****
 	nIDFhwnd = Footy2GetWnd(nID,VIEWMODE_NORMAL)
 
 	;***** Editorのフォント設定 *****
-	Footy2SetFontFace nID,FFM_ANSI_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_BALTIC_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_FFM_BIG5_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_EASTEUROPE_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_GB2312_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_GREEK_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_HANGUL_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_RUSSIAN_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_SHIFTJIS_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_TURKISH_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_VIETNAMESE_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_ARABIC_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_HEBREW_CHARSET,"MS Gothic",0
-	Footy2SetFontFace nID,FFM_THAI_CHARSET,"MS Gothic",0
-	Footy2SetFontSize nID,11,0
+	Footy2SetFontFace nID,FFM_ANSI_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_BALTIC_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_FFM_BIG5_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_EASTEUROPE_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_GB2312_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_GREEK_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_HANGUL_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_RUSSIAN_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_SHIFTJIS_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_TURKISH_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_VIETNAMESE_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_ARABIC_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_HEBREW_CHARSET,seltfont,0
+	Footy2SetFontFace nID,FFM_THAI_CHARSET,seltfont,0
+	Footy2SetFontSize nID,fontsize,0
 
 	;***** Editorの各部の配色設定 *****
 	gosub *editcolorset
@@ -274,6 +293,14 @@
 	;gsel 1,-1
 	width 240,320,0,0
 	hwnd1 = hwnd
+	SetWindowLong hwnd , -20 , GetWindowLong(hwnd , -20) | 0x00080000
+	pos 0,0
+	objsize 240,220
+	ab = ""
+	listbox k,100,ab
+	lbStat = stat
+	lbHandle = objinfo(lbStat,2)
+	SetLayered hwnd , 0 , 0 , 2
 	gsel 0
 	stop
 
@@ -357,11 +384,15 @@
 
 		getkey BSC,8
 		getkey Space,32
-		if (BSC == 0) or (Space == 0){
+		getkey Tab,9
+		if (BSC == 0) and (Space == 0) and (Tab == 0){
 			gosub *GetLineInfo
 			;CaretLine,CaretPos
 			;SetWindowPos hwnd1, HWND_TOP, CaretPos, CaretLine(1) + 17, 0, 0, SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOSIZE
+			winx = ginfo_wx1
+			winy = ginfo_wy1
 			gsel 1
+
 			sdim st,1024
 			sdim stt,1024
 			sdim tmp,1024
@@ -375,42 +406,42 @@
 			notesel aa
 
 			split stt(CaretLine)," ",tmp
-			if stat == 0{
-				tmp(0) = stt
-				tmptmp = 0
-			}else{
-				if length(tmp) == 1{
-					tmptmp = 0
-					;dialog length(tmp)
-				}else{
-					if length(tmp) == 2{
-						tmptmp = length(tmp) - 1
-						;dialog length(tmp)
-					}
-				}
-			}else{
-				tmptmp = length(tmp) - 1
-				;dialog length(tmp)
-			}
-			logmes length(tmp)
+			lentmp = stat
+			tmptmp = lentmp - 1
+			logmes tmp(tmptmp)
+			count = 0
 			repeat notemax
 				noteget tempstr,cnt
 				;dialog tmptmp
 				; 命令、関数、システム変数等
 				; HSP_CMDCOLOR($0000F081)=EMP_IND_BLANKS | EMP_IND_PARENTHESIS | EMP_IND_OTHER_ASCII_SIGN
 				; if instr(stt(CaretLine),0,tempstr) != -1{
-				if (instr(tempstr,CaretPos,tmp(tmptmp)) != -1) or (tempstr == tmp(tmptmp)){
+				if (instr(tempstr,0,tmp(tmptmp)) == 0) or (tempstr == tmp(tmptmp)){
 					ab += str(tempstr + "\n")
 					logmes "ヒット: "+tempstr
+					if (tempstr == tmp(tmptmp)){
+						k = count
+					}
+					count += 1
 					//k = cnt
 				}/*else{
 					logmes "ノーヒット: "+tempstr
 				}*/
 			loop
-			pos 0,0
-			objsize 240,220
-			listbox k,100,ab
-			SetWindowPos hwnd1,0,CaretPos * 10,CaretLine * 20 + 70,240,320,SWP_NOACTIVATE | SWP_SHOWWINDOW
+			notesel ab
+			objprm lbStat,ab
+			objprm lbStat,k
+			if count != 0{
+				SetLayered hwnd , 0 , 100*255/100 , 2
+			}else{
+				SetLayered hwnd , 0 , 0 , 2
+			}
+			SetWindowPos hwnd1,0,(CaretPos * FontRSize) + 350 + winx,(CaretLine * FontRSize) + 80 + winy,240,320,SWP_NOACTIVATE | SWP_SHOWWINDOW
+			gsel 0
+		}else{
+			gsel 1
+			SetLayered hwnd , 0 , 0 , 2
+			gsel 0
 		}
 	return
 
@@ -921,8 +952,11 @@
 	Footy2SetFontFace nID,FFM_ARABIC_CHARSET,refstr,0
 	Footy2SetFontFace nID,FFM_HEBREW_CHARSET,refstr,0
 	Footy2SetFontFace nID,FFM_THAI_CHARSET,refstr,0
-	Footy2SetFontSize nID,result(0),1
-	font refstr,result(0)
+	Footy2SetFontSize nID,result(2),1
+	font refstr,result(2)
+	ini_puts "Editor", "Font", refstr
+	ini_puti "Editor", "FontRSize", result(0)
+	ini_puti "Editor", "FontSize", result(2)
 	stsmsg+=" が完了しました。"
 	gosub *simplemode
 	return
@@ -984,7 +1018,7 @@
 
 *SizeAdjust
 	;***** ウィンドウサイズ変更時の処理 *****
-	ret = Footy2Move(nID,INIX_pos,INIY_pos,ginfo_winx,ginfo_winy-sts_h)
+	ret = Footy2Move(nID,INIX_pos,INIY_pos,ginfo_winx - 300,ginfo_winy-sts_h)
 	sendmsg stshwnd,iparam,0,0
 	return
 
